@@ -72,7 +72,7 @@ userSchema.methods.isPasswordCorrect = async function(password){
 }
 
 userSchema.methods.generateAccessToken = function(){
-    jwt.sign(
+    return jwt.sign(
         {
             _id: this._id,
             email: this.email,
@@ -102,9 +102,9 @@ userSchema.methods.generateTemporaryToken = function(){
 
     const hashedToken = crypto.createHash("sha256").update(unHashedToken).digest("hex")
 
-    const TokenExpiry = Date.now() + (20*60*1000) // 20 mins
+    const tokenExpiry = Date.now() + (20*60*1000) // 20 mins
 
-    return {hashedToken, unHashedToken, TokenExpiry}
+    return {hashedToken, unHashedToken, tokenExpiry}
 }
 
 export const User = mongoose.model("User", userSchema);
