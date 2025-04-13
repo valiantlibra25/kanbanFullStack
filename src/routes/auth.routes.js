@@ -1,5 +1,5 @@
 import express from 'express'
-import {changeCurrentPassword, forgotPasswordRequest, getCurrentUser, loginUser, logoutUser, registerUser, resetForgottenPassword, verifyEmail} from '../controllers/auth.controllers.js'
+import {changeCurrentPassword, forgotPasswordRequest, getCurrentUser, loginUser, logoutUser, refreshToken, registerUser, resetForgottenPassword, verifyEmail} from '../controllers/auth.controllers.js'
 import { validate } from "../middlewares/validator.middleware.js";
 import { userRegisterValidator,userLoginValidator,userForgotPasswordValidator,userResetForgottenPasswordValidator,userChangeCurrentPasswordValidator } from '../validators/index.js'
 import { isLoggedIn } from '../middlewares/auth.middleware.js';
@@ -20,6 +20,9 @@ userRouter.route("/getme")
 
 userRouter.route("/logout")
 .post(isLoggedIn,logoutUser)
+
+userRouter.route("/refreshtoken")
+.post(isLoggedIn,refreshToken)
 
 userRouter.route("/forgotpassword")
 .post(userForgotPasswordValidator(), validate, forgotPasswordRequest)

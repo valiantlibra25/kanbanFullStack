@@ -5,6 +5,7 @@ import { ApiResponse } from '../utils/api-response.js'
 import { User } from '../models/user.models.js'
 import { emailVerificationMailgenContent, forgotPasswordMailgenContent, sendEmail } from '../utils/mail.js'
 import crypto from 'crypto'
+import jwt from 'jsonwebtoken'
 
 
 const registerUser = asyncHandler(async (req, res) => {
@@ -158,6 +159,41 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 
 });
 
+const refreshToken = asyncHandler(async (req,res)=>{
+   const token = req.cookies.token
+
+   if(!token){
+      throw new ApiError(400,"No token found")
+   }
+
+   const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
+   console.log(decoded)
+
+   const user = await User.findById(decoded._id)
+
+   if(!user){
+      throw new ApiError(400,"user  not found")
+   }
+   console.log(user)
+
+   const newToken = await user.generateRefreshToken()
+
+   console.log(newToken)
+
+   const cookieOptions = {
+      httpOnly: true,
+      secure: true,
+      maxAge: 24 * 60 * 60 * 1000
+   }
+
+   res.cookie("token", newToken, cookieOptions)
+
+   const response = new ApiResponse(201, "token refreshed");
+
+   res.status(response.statusCode).json(response);
+
+})
+
 const logoutUser = asyncHandler(async (req, res) => {
 
    res.cookie('token', "")
@@ -273,4 +309,4 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
  });
 
 
-export { registerUser, verifyEmail, loginUser, getCurrentUser, logoutUser, forgotPasswordRequest, resetForgottenPassword, changeCurrentPassword }
+export { registerUser, verifyEmail, loginUser, getCurrentUser, logoutUser, forgotPasswordRequest, resetForgottenPassword, changeCurrentPassword, refreshToken }
