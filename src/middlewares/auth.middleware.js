@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken'
 export const isLoggedIn = async (req, res, next) =>{
     try {
         console.log(req.cookies)
-        let token = req.cookies.token || ""
+        let token = req.cookies.accessToken || ""
 
         console.log("token found", token ? "Yes" : "No")
 

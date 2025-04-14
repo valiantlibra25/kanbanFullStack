@@ -9,9 +9,11 @@ import jwt from 'jsonwebtoken'
 
 
 const registerUser = asyncHandler(async (req, res) => {
-   const { username, email, password, avatar, fullname } = req.body
+   const { username, email, password, fullname } = req.body
 
-   const existingUser = await User.findOne({ email })
+   const existingUser = await User.findOne({
+      $or:[{username},{email}]
+   })
    if (existingUser) {
       throw new ApiError(400, "user already exists")
    }
@@ -20,7 +22,6 @@ const registerUser = asyncHandler(async (req, res) => {
       username,
       email,
       password,
-      avatar,
       fullname
    })
 
@@ -54,7 +55,15 @@ const registerUser = asyncHandler(async (req, res) => {
       mailgenContent
    })
 
-   const response = new ApiResponse(201, "User registered successfully", {
+   const createUser = await User.findById(user._id).select(
+      "-password -refreshtoken -avatar" 
+   )
+
+   if(!createUser){
+      throw new ApiError(500,"Something went wrong while registering your account")
+   }
+
+   const response = new ApiResponse(201,createUser, "User registered successfully", {
       email
    });
 
@@ -103,10 +112,45 @@ const verifyEmail = asyncHandler(async (req, res) => {
 
 });
 
+const resendEmailVerification = asyncHandler (async(req,res)=>{
+   const {email} = req.body
+
+   const user = await User.findOne({email})
+   console.log(user)
+   if(!user){
+      throw new ApiError(400,"email not registered, please sign up")
+   }
+   if(user.isEmailVerified){
+      throw new ApiError(400,"email alredy verified")
+   }
+
+   const token = user.generateTemporaryToken()
+
+   user.emailVerificationToken = token.hashedToken
+   user.emailVerificationExpiry = token.tokenExpiry
+
+   await user.save()
+
+   await sendEmail({
+      email,
+      subject:"verify your email",
+      mailgenContent: emailVerificationMailgenContent(
+         user.username,
+         `${process.env.BASE_URL}/api/v1/users/verify/${token.unHashedToken}`,
+      )
+   })
+
+   return res
+   .status(201)
+   .json(
+     new ApiResponse(201, "Verification email sent. Please check your inbox."),
+   );
+})
+
 const loginUser = asyncHandler(async (req, res) => {
-   const { username, email, password } = req.body;
+   const { email, password } = req.body;
    //validation
-   const user = await User.findOne({ username })
+   const user = await User.findOne({ email })
    console.log(user)
 
    if (!user) {
@@ -120,21 +164,26 @@ const loginUser = asyncHandler(async (req, res) => {
    if (!isMatch) {
       throw new ApiError(400, "Invalid Password")
    }
-   const token = await user.generateAccessToken()
+   const accessToken = await user.generateAccessToken()
+   const refreshToken = await user.generateRefreshToken()
 
+   user.refreshToken = refreshToken
    console.log(user.generateAccessToken())
    // console.log("token", token)
 
-   if (!token) {
+   if (!accessToken) {
       throw new ApiError(400, "token is not valid")
    }
+   await user.save()
+
 
    const cookieOptions = {
       httpOnly: true,
       secure: true,
       maxAge: 24 * 60 * 60 * 1000
    }
-   res.cookie("token", token, cookieOptions)
+   res.cookie("accessToken", accessToken, cookieOptions)
+   res.cookie("refreshToken", refreshToken, cookieOptions)
 
    const response = new ApiResponse(201, "User logged in successfully");
 
@@ -160,33 +209,37 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 });
 
 const refreshToken = asyncHandler(async (req,res)=>{
-   const token = req.cookies.token
+   const token = req.cookies.refreshToken
 
    if(!token){
       throw new ApiError(400,"No token found")
    }
 
-   const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
+   const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET)
    console.log(decoded)
 
-   const user = await User.findById(decoded._id)
+   const user = await User.findById(req.user._id)
 
    if(!user){
       throw new ApiError(400,"user  not found")
    }
    console.log(user)
 
-   const newToken = await user.generateRefreshToken()
+   const newRefreshToken = await user.generateRefreshToken()
 
-   console.log(newToken)
+   user.refreshToken = newRefreshToken
 
+   await user.save()
+
+   // console.log(newToken)
+   console.log(user)
    const cookieOptions = {
       httpOnly: true,
       secure: true,
       maxAge: 24 * 60 * 60 * 1000
    }
 
-   res.cookie("token", newToken, cookieOptions)
+   res.cookie("refreshToken", newRefreshToken, cookieOptions)
 
    const response = new ApiResponse(201, "token refreshed");
 
@@ -195,8 +248,18 @@ const refreshToken = asyncHandler(async (req,res)=>{
 })
 
 const logoutUser = asyncHandler(async (req, res) => {
-
-   res.cookie('token', "")
+   await User.findByIdAndUpdate(
+      req.user._id,{
+         $unset:{
+            refreshToken: 1
+         }
+      },
+      {
+         new: true
+      }
+   )
+   res.clearCookie("accessToken")
+   res.clearCookie("refreshToken")
    //validation
 
    const response = new ApiResponse(201, "User Logged out successfully");
@@ -309,4 +372,4 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
  });
 
 
-export { registerUser, verifyEmail, loginUser, getCurrentUser, logoutUser, forgotPasswordRequest, resetForgottenPassword, changeCurrentPassword, refreshToken }
+export { registerUser, verifyEmail, loginUser, getCurrentUser, logoutUser, forgotPasswordRequest, resetForgottenPassword, changeCurrentPassword, refreshToken, resendEmailVerification  }

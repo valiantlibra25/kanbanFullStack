@@ -3,6 +3,8 @@ import { Project } from "../models/project.models.js";
 import { ApiResponse } from "../utils/api-response.js";
 import { ApiError } from "../utils/api-error.js";
 import { json } from "express";
+import { ProjectMember } from "../models/projectmember.models.js";
+import { UserRolesEnum } from "../utils/constants.js";
 
 const createProject = asyncHandler(async (req, res) => {
     const { name, description } = req.body
@@ -93,4 +95,69 @@ const deleteProject = asyncHandler(async (req,res)=>{
 
 })
 
-export { createProject, getProjects, updateProject, deleteProject, getProjectById }
+const addMembersToProject  = asyncHandler (async(req,res)=>{
+    const {projectId, userId, role=UserRolesEnum.MEMBER} = req.body
+
+    const projectExsists = await Project.findById({_id:projectId})
+
+    if(!projectExsists){
+        throw new ApiError(400,"Project does not exists")
+    }
+
+    const exsistingMember = await ProjectMember.findOne({
+        project: projectId,
+        user: userId,
+    })
+
+    if(exsistingMember){
+        throw new ApiError(400,"User already a member of this project")
+    }
+
+    const newMember = ProjectMember.create({
+        project: projectId,
+        user: userId,
+        role
+    })
+
+    return res.status(201).json(new ApiResponse(201,newMember,"Member added to project"))
+})
+
+const deleteMember = asyncHandler(async(req,res)=>{
+    const {projectId, userId} = req.body
+
+    const removeMember = await ProjectMember.findOneAndDelete({
+        project: projectId,
+        user: userId
+    })
+
+    if(!removeMember){
+        throw new ApiError(400,"no member found the the project")
+    }
+
+    return res.status(201).json(new ApiResponse(201,"Member removed successfully"))
+})
+
+const getProjectMembers = asyncHandler(async(req,res)=>{
+    const {projectId} = req.params
+    const userId = req.user._id
+
+    // const isMember = await ProjectMember.findOne({
+    //     user: userId
+    // })
+
+    // if(!isMember){
+    //     throw new ApiError(400,"you are not apart of the project")
+    // }
+
+    const members = await ProjectMember.find({
+        project:projectId
+    }).populate(
+        "user",
+        "username email"
+    )
+
+    return res.status(200).json(new ApiResponse(200,members))
+})
+
+
+export { createProject, getProjects, updateProject, deleteProject, getProjectById, addMembersToProject, deleteMember, getProjectMembers }
