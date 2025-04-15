@@ -155,4 +155,78 @@ const getTask = asyncHandler(async(req,res)=>{
     return res.status(200).json(new ApiResponse(201,task,"Fetched all tasks"))
 })
 
-export {createTask, createSubTask, deleteSubTask, deleteTask, getTaskById,getTask}
+const updateTask = asyncHandler(async(req,res)=>{
+    const {taskId} = req.params
+
+    const userId = req.user?._id
+
+    const {
+        title,
+        description,
+        projectId,
+        assignedTo,
+        status = TaskStatusEnum.TODO
+    } = req.body
+
+    if(!taskId){
+        throw new ApiError(400,"taskID is required")
+    }
+
+    if(status && !Object.values(TaskStatusEnum).includes(status)){
+        throw new ApiError(400,'Invalid task status')
+    }
+
+    const updateData = {
+        ...(title && {title: title.trim()}),
+        ...(description && {description: description.trim()}),
+        ...(assignedTo && {assignedTo}),
+        ...(userId && {assignedBy: userId}),
+        ...(status && {status})
+    }
+
+    const updateTask = await Task.findByIdAndUpdate(
+        {_id: taskId, ...(projectId && {project: projectId})},
+        updateData,
+        {new: true}
+    )
+
+    if(!updateTask){
+        throw new ApiError(404,"Task not found for given taskID")
+    }
+
+    return res.status(200).json(new ApiResponse(201,"Task updated successfully"))
+})
+
+const updateSubTask = asyncHandler(async(req,res)=>{
+    const {taskId,subtaskId} = req.params
+    const {title,isCompleted,} = req.body
+
+    if(!taskId || !subtaskId){
+        throw new ApiError(400,"taskId and subtaskId is needed")
+    }
+
+    if(typeof isCompleted !== "boolean"){
+        throw new ApiError(400,"enter only true or false in isCompleted")
+    }
+
+    const updatedSubTask = await SubTask.findOneAndUpdate(
+        {_id:subtaskId,task:taskId},
+        {
+            ...(isCompleted && {isCompleted}),
+            ...(title && {title})
+        },
+        {
+            new:true
+        }
+    )
+
+    if(!updatedSubTask){
+        throw new ApiError(400,"Subtask not found for give taskID")
+    }
+
+    return res.status(200).json(new ApiResponse(201,"Subtask updated successfully"))
+
+
+})
+
+export {createTask, createSubTask, deleteSubTask, deleteTask, getTaskById,getTask, updateTask,updateSubTask}

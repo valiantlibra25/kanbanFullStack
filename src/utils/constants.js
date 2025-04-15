@@ -12,4 +12,5 @@ export const TaskStatusEnum = {
     DONE: "done"
 }
 
+
 export const AvailableTaskStatuses = Object.values(TaskStatusEnum)

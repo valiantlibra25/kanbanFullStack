@@ -1,6 +1,6 @@
 import {Router} from 'express'
 import {isLoggedIn} from '../middlewares/auth.middleware.js'
-import { createSubTask, createTask, deleteSubTask, deleteTask, getTask, getTaskById } from '../controllers/task.controllers.js'
+import { createSubTask, createTask, deleteSubTask, deleteTask, getTask, getTaskById, updateSubTask, updateTask } from '../controllers/task.controllers.js'
 
 
 const taskRouter = Router()
@@ -23,6 +23,12 @@ taskRouter.route("/gettaskbyid/:taskId")
 
 taskRouter.route("/gettask")
 .get(isLoggedIn,getTask)
+
+taskRouter.route("/updatetask/:taskId")
+.get(isLoggedIn,updateTask)
+
+taskRouter.route("/updatesubtask/:taskId/:subtaskId")
+.get(isLoggedIn,updateSubTask)
 
 export default taskRouter
 
